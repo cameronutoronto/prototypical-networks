@@ -39,17 +39,18 @@ def load_class_images(d):
     if d['class'] not in OMNIGLOT_CACHE:
         alphabet, character, rot = d['class'].split('/')
         image_dir = os.path.join(OMNIGLOT_DATA_DIR, 'data', alphabet, character)
-
+        #print(">>>" + image_dir)
         image_ds = TransformDataset(ListDataset(sorted(glob.glob(os.path.join(image_dir, '*.png')))),
                                     compose([partial(convert_dict, 'file_name'),
                                              partial(load_image_path, 'file_name', 'data'),
                                              partial(rotate_image, 'data', float(rot[3:])),
                                              partial(scale_image, 'data', 28, 28),
                                              partial(convert_tensor, 'data')]))
+        #print(len(image_ds))
 
         loader = torch.utils.data.DataLoader(image_ds, batch_size=len(image_ds), shuffle=False)
-
         for sample in loader:
+            #print(sample)
             OMNIGLOT_CACHE[d['class']] = sample['data']
             break # only need one sample because batch size equal to dataset length
 
@@ -112,6 +113,7 @@ def load(opt, splits):
         with open(os.path.join(split_dir, "{:s}.txt".format(split)), 'r') as f:
             for class_name in f.readlines():
                 class_names.append(class_name.rstrip('\n'))
+
         ds = TransformDataset(ListDataset(class_names), transforms)
 
         if opt['data.sequential']:
@@ -121,5 +123,7 @@ def load(opt, splits):
 
         # use num_workers=0, otherwise may receive duplicate episodes
         ret[split] = torch.utils.data.DataLoader(ds, batch_sampler=sampler, num_workers=0)
-
+    print("Ret:", type(ret))
+    for key,value in ret.items():
+        print(key, type(value))
     return ret

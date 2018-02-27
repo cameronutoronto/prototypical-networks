@@ -30,6 +30,7 @@ class EpisodicBatchSampler(object):
         self.n_classes = n_classes
         self.n_way = n_way
         self.n_episodes = n_episodes
+        self.valid = True
 
     def __len__(self):
         return self.n_episodes
