@@ -10,8 +10,15 @@ from protonets.utils import filter_opt, merge_dict
 import protonets.utils.data as data_utils
 import protonets.utils.model as model_utils
 
-SAMPLE_MODES = ["one_shot", "random_equal", "random_unequal", "smallest_small_dists_batch", "largest_small_dists_batch", "smallest_sum_dists_batch", "largest_sum_dists_batch", "smallest_sum_dist_diffs_batch", "largest_sum_dist_diffs_batch", "smallest_sum_dist_diffs_pair_batch", "smallest_sum_dist_diffs", "smallest_sum_dist_diffs_b"]
-
+SAMPLE_MODES = ["one_shot", "random_equal", "random_unequal", "smallest_small_dists_batch",
+                "largest_small_dists_batch", "smallest_sum_dists_batch",
+                "largest_sum_dists_batch", "smallest_sum_dist_diffs_batch",
+                "largest_sum_dist_diffs_batch", "smallest_sum_dist_diffs_pair_batch",
+                 "smallest_sum_dist_diffs",
+                "smallest_sum_dist_diffs1_rand_batch", "smallest_small_dists_unique_batch",
+                "k_means_centers_batch", "smallest_sum_dist_diffs", "smallest_sum_dist_diffs_b",
+                "smallest_sum_dist_diffs_c"]
+#"largest_sum_dist_diffs_pair_batch" is broken
 def main(opt):
     # load model
     model = torch.load(opt['model.model_path'])
@@ -56,7 +63,7 @@ def main(opt):
 
     if data_opt['data.cuda']:
         model.cuda()
-    SAMPLE_MODES = ["meta_learning_nn"]
+    #SAMPLE_MODES = ["smallest_sum_dist_diffs_batch"]
     meters = { field: tnt.meter.AverageValueMeter() for field in model_opt['log.fields'] }
     for sample_mode in SAMPLE_MODES:
         model_utils.evaluate(model, data['test'], meters, sample_mode, desc="test")

@@ -28,7 +28,7 @@ NUM_HIDDEN = 512 # 1024 gave 74.074 and 1.53687
 NUM_CLASSES = 3
 TRAIN_SET_SIZE = 40
 TRAIN_STEPS = 500
-TRAIN_ITS = 5
+TRAIN_ITS = 3
 EVALUATE_ONLY = False
 
 random.seed(1234)
@@ -48,7 +48,7 @@ def get_data():
         if (line == '\n'):
           continue
         sline = line[:-1].split(',')
-        print(sline[0], sline[783], sline[1568], sline[2352], sline[3136],sline[3920], sline[-1])
+        #print(sline[0], sline[783], sline[1568], sline[2352], sline[3136],sline[3920], sline[-1])
         for x in range(len(sline)):
           sline[x] = float(sline[x])
         data.append(sline[:-1])
@@ -135,7 +135,7 @@ def main(unused_argv):
 
   tf_optimizer=tf.train.ProximalAdagradOptimizer(learning_rate=0.1,
                                   l2_regularization_strength=0.0)
-  mod_dir = "active_model2"
+  mod_dir = "active_model"
 
   voicerecog_classifier = tf.estimator.DNNRegressor(feature_columns=input_layer,
                           hidden_units=LAYERS, model_dir=mod_dir,

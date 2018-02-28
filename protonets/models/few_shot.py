@@ -21,6 +21,21 @@ class Protonet(nn.Module):
         
         self.encoder = encoder
 
+    def embedded_points(self, sample):
+        xs = Variable(sample['xs']) # support
+        xq = Variable(sample['xq']) # query
+
+        n_class = xs.size(0)
+        assert xq.size(0) == n_class
+        n_support = xs.size(1)
+        n_query = xq.size(1)
+
+        x = torch.cat([xs.view(n_class * n_support, *xs.size()[2:]),
+                       xq.view(n_class * n_query, *xq.size()[2:])], 0)
+
+        z = self.encoder.forward(x)
+        return z.data
+    
     def loss(self, sample):
         xs = Variable(sample['xs']) # support
         xq = Variable(sample['xq']) # query
