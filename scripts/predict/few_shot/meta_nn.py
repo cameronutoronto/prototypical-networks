@@ -23,23 +23,23 @@ import os
 
 import random
 
-LAYER_SIZE = (1 + 28*28) * 5
-NUM_HIDDEN = 512 # 1024 gave 74.074 and 1.53687
+LAYER_SIZE = (1 + 8*8) * 5 + 8*8 + 1 #
+NUM_HIDDEN = 512 #
 NUM_CLASSES = 3
 TRAIN_SET_SIZE = 40
 TRAIN_STEPS = 500
 TRAIN_ITS = 20
 EVALUATE_ONLY = False
-MODEL_DIR = "active_model_big"
+MODEL_DIR = "active_model3"
 
 random.seed(1234)
 
-LAYERS = [LAYER_SIZE, LAYER_SIZE]
+LAYERS = [LAYER_SIZE*8, LAYER_SIZE*8]
 
-DROPOUT = 0.5
+DROPOUT = 0.3
 REG_STRENGTHS = [0.0, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
-#tf.logging.set_verbosity(tf.logging.INFO)
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 def get_data():
     data = []
@@ -49,7 +49,7 @@ def get_data():
         if (line == '\n'):
           continue
         sline = line[:-1].split(',')
-        #print(sline[0], sline[783], sline[1568], sline[2352], sline[3136],sline[3920], sline[-1], len(sline))
+
         for x in range(len(sline)):
           sline[x] = float(sline[x])
         data.append(sline[:-1])

@@ -14,10 +14,15 @@ SAMPLE_MODES = ["one_shot", "random_equal", "random_unequal", "smallest_small_di
                 "largest_small_dists_batch", "smallest_sum_dists_batch",
                 "largest_sum_dists_batch", "smallest_sum_dist_diffs_batch",
                 "largest_sum_dist_diffs_batch", "smallest_sum_dist_diffs_pair_batch",
-                 "smallest_sum_dist_diffs",
                 "smallest_sum_dist_diffs1_rand_batch", "smallest_small_dists_unique_batch",
                 "k_means_centers_batch", "smallest_sum_dist_diffs", "smallest_sum_dist_diffs_b",
                 "smallest_sum_dist_diffs_c"]
+
+SAMPLE_MODES = ["smallest_sum_dist_diffs", "smallest_sum_dist_diffs_b",
+                "smallest_sum_dist_diffs_c"]
+
+SAMPLE_MODES = ["meta_learning_nn"]
+
 #"largest_sum_dist_diffs_pair_batch" is broken
 def main(opt):
     # load model
