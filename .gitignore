@@ -1,5 +1,8 @@
 *.pyc
 *.swp
 *.egg-info/
-results/
-data/*/data
+data/*
+scripts/predict/few_shot/active_model*
+scripts/predict/few_shot/change_in_losses*
+protonets/utils/active_model*
+protonets_orig
