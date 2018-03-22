@@ -23,6 +23,8 @@ SAMPLE_MODES = ["smallest_sum_dist_diffs", "smallest_sum_dist_diffs_b",
 
 SAMPLE_MODES = ["meta_learning_nn"]
 
+#SAMPLE_MODES = ["smallest_sum_dist_diffs1_rand_batch", "smallest_sum_dist_diffs_pair_batch"]
+
 #"largest_sum_dist_diffs_pair_batch" is broken
 def main(opt):
     # load model

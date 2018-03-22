@@ -23,28 +23,38 @@ import os
 
 import random
 
-LAYER_SIZE = (1 + 8*8) * 5 + 8*8 + 1 #
+LAYER_SIZE = 4 * 5 + 95 + 1
 NUM_HIDDEN = 512 #
 NUM_CLASSES = 3
-TRAIN_SET_SIZE = 40
+TRAIN_SET_FRAC = 0.8
 TRAIN_STEPS = 500
 TRAIN_ITS = 20000
 EVALUATE_ONLY = False
-MODEL_DIR = "active_model9"
+MODEL_DIR = "active_model_new_0"
 
 random.seed(1234)
 
 LAYERS = [LAYER_SIZE, LAYER_SIZE]
 
-DROPOUT = 0.1
+DROPOUT = 0.2
 REG_STRENGTHS = [0.0, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
 tf.logging.set_verbosity(tf.logging.ERROR)
 
+ADD_PROTOS = False
+ADD_KMEANS_CENTERS = False
+ADD_PROTO_DISTS = True
+ADD_PROTO_PROBS = True
+ADD_KMEANS_CENTERS_DISTS = True
+ADD_KMEANS_CENTERS_PROBS = True
+ADD_POOL_POINT_DISTS = True
+ADD_BASE_LOSS = True
+
+
 def get_data():
     data = []
     labels = []
-    with open("change_in_losses.txt") as f:
+    with open("change_in_losses2.txt") as f:
       for line in f:
         if (line == '\n'):
           continue
@@ -52,9 +62,59 @@ def get_data():
 
         for x in range(len(sline)):
           sline[x] = float(sline[x])
-        data.append(sline[:-1])
+        vals = []
+        
+        start_ind = 0
+        end_ind = start_ind + 5*(8*8+1)
+        if ADD_PROTOS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+                
+        start_ind = end_ind
+        end_ind = start_ind + 5*8*8
+        if ADD_KMEANS_CENTERS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind + 1 #skip extra base_loss
+        end_ind = start_ind + 5
+        if ADD_PROTO_DISTS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind
+        end_ind = start_ind + 5
+        if ADD_PROTO_PROBS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind
+        end_ind = start_ind + 5
+        if ADD_KMEANS_CENTERS_DISTS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind
+        end_ind = start_ind + 5
+        if ADD_KMEANS_CENTERS_PROBS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind
+        end_ind = start_ind + 95
+        if ADD_POOL_POINT_DISTS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+
+        start_ind = end_ind
+        end_ind = start_ind + 1
+        if ADD_BASE_LOSS:
+          for x in range(start_ind, end_ind):
+            vals.append(sline[x])
+            
+        data.append(vals)
         labels.append(sline[-1])
-    split = int(0.8*len(data))
+    split = int(TRAIN_SET_FRAC*len(data))
     train_data = data[:split]
     train_labels = labels[:split]
     eval_data = data[split:]
@@ -70,14 +130,15 @@ def main(unused_argv):
 
   # Create the Estimator
   print("Creating Classifier...")
-  input_layer = [tf.feature_column.numeric_column("x", shape=[LAYER_SIZE])]
+  input_layer = [tf.feature_column.numeric_column("x", shape=[len(train_data[0])])]
 
   tf_optimizer=tf.train.ProximalAdagradOptimizer(learning_rate=0.1,
                                   l2_regularization_strength=0.0)
+  tf_optimizer = tf.train.AdamOptimizer()
 
-  voicerecog_classifier = tf.estimator.DNNRegressor(feature_columns=input_layer,
+  meta_nn = tf.estimator.DNNRegressor(feature_columns=input_layer,
                           hidden_units=LAYERS, model_dir=MODEL_DIR,
-                                      optimizer=tf_optimizer,  dropout=DROPOUT)
+                                      optimizer=tf_optimizer,  dropout=DROPOUT) #mean squred error L2 loss
   tensors_to_log = {}
   logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
@@ -91,7 +152,7 @@ def main(unused_argv):
         num_epochs=None,
         shuffle=True)
 
-    voicerecog_classifier.train(
+    meta_nn.train(
         input_fn=train_input_fn,
         steps=TRAIN_STEPS,
         hooks=[logging_hook])
@@ -102,7 +163,7 @@ def main(unused_argv):
             y=train_labels,
             num_epochs=1,
             shuffle=False)
-    eval_results = voicerecog_classifier.evaluate(input_fn=eval_input_fn)
+    eval_results = meta_nn.evaluate(input_fn=eval_input_fn)
     print(eval_results)
 
     # Evaluate the model and print results
@@ -111,7 +172,7 @@ def main(unused_argv):
             y=eval_labels,
             num_epochs=1,
             shuffle=False)
-    eval_results = voicerecog_classifier.evaluate(input_fn=eval_input_fn)
+    eval_results = meta_nn.evaluate(input_fn=eval_input_fn)
     print(eval_results)
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@ from protonets.models import get_model
 from protonets.models.utils import euclidean_dist
 import copy
 
-import numpy as np
 import tensorflow as tf
 import random
 
@@ -76,29 +75,29 @@ def std_dev(items):
 
 
 ## Standard check best
-def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
-    model.eval()
-    print("Sample Mode:", sample_mode)
-    for field,meter in meters.items():
-        meter.reset()
-
-    if desc is not None:
-        data_loader = tqdm(data_loader, desc=desc)
-    num_inv_samples = 0
-
-    for sample in data_loader:
-        sample['valid'] = True
-        new_sample = create_new_sample(copy.deepcopy(sample), sample_mode, model)
-        if not new_sample['valid']:
-            num_inv_samples += 1
-            continue
-        _, output = model.loss(new_sample)
-        
-        for field, meter in meters.items():
-            meter.add(output[field])
-
-    print("Invalid Samples:", num_inv_samples)
-    return meters
+##def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
+##    model.eval()
+##    print("Sample Mode:", sample_mode)
+##    for field,meter in meters.items():
+##        meter.reset()
+##
+##    if desc is not None:
+##        data_loader = tqdm(data_loader, desc=desc)
+##    num_inv_samples = 0
+##
+##    for sample in data_loader:
+##        sample['valid'] = True
+##        new_sample = create_new_sample(copy.deepcopy(sample), sample_mode, model)
+##        if not new_sample['valid']:
+##            num_inv_samples += 1
+##            continue
+##        _, output = model.loss(new_sample)
+##        
+##        for field, meter in meters.items():
+##            meter.add(output[field])
+##
+##    print("Invalid Samples:", num_inv_samples)
+##    return meters
 
 # Add Single
 ##def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
@@ -128,54 +127,97 @@ def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
 
 ##Get Change in Loss information
 #0.105104 +- 0.024076     0.978543 +- 0.002945
-##def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
-##    print("Calculating Loss Information - Eval Results Invalid!")
-##    model.eval()
-##    print("Sample Mode:", sample_mode)
-##    for field,meter in meters.items():
-##        meter.reset()
-##
-##    if desc is not None:
-##        data_loader = tqdm(data_loader, desc=desc)
-##    num_inv_samples = 0
-##
-##    for sample in data_loader:
-##        new_sample = create_new_sample(copy.deepcopy(sample), "one_shot")
-##        _, output = model.loss(new_sample)
-##        base_loss = output['loss']
-##        sample['valid'] = True
-##        for x in range(95):
-##            new_sample, protos, test_point, counts = create_new_sample(copy.deepcopy(sample), str(x))
-##            if not new_sample['valid']:
-##                num_inv_samples += 1
-##                continue
-##            _, output = model.loss(new_sample)
-##            loss = output['loss']
-##            change_in_loss = base_loss - loss
-##            save_change_loss_info(protos, counts, test_point, base_loss, change_in_loss)
-##            for field, meter in meters.items():
-##                meter.add(output[field])
-##
-##    print("Invalid Samples:", num_inv_samples)
-##    return meters
+def evaluate(model, data_loader, meters, sample_mode="random_equal", desc=None):
+    print("Calculating Loss Information - Eval Results Invalid!")
+    model.eval()
+    print("Sample Mode:", sample_mode)
+    for field,meter in meters.items():
+        meter.reset()
 
-def compress_protos(protos, counts):
+    if desc is not None:
+        data_loader = tqdm(data_loader, desc=desc)
+    num_inv_samples = 0
+
+    for sample in data_loader:
+        new_sample = create_new_sample(copy.deepcopy(sample), "one_shot", model)
+        _, output = model.loss(new_sample)
+        base_loss = output['loss']
+        sample['valid'] = True
+        for x in range(95):
+            new_sample, protos, test_point, counts, k_means_centers, emb_images = create_new_sample(copy.deepcopy(sample), str(x), model)
+            if not new_sample['valid']:
+                num_inv_samples += 1
+                continue
+            _, output = model.loss(new_sample)
+            loss = output['loss']
+            change_in_loss = base_loss - loss
+            #save_change_loss_info(protos, counts, test_point, k_means_centers, base_loss, change_in_loss)
+            save_change_loss_info2(protos, counts, k_means_centers, test_point, emb_images, base_loss, change_in_loss)
+            for field, meter in meters.items():
+                meter.add(output[field])
+
+    print("Invalid Samples:", num_inv_samples)
+    return meters
+
+def compress_protos(protos, counts, k_means_centers, test_point, base_loss):
     compressed = []
     for x in range(len(protos)):
         compressed.append(counts[x])
         for y in range(len(protos[x])):
             compressed.append(protos[x][y])
+    for x in range(len(k_means_centers)):
+        for y in range(len(k_means_centers[x])):
+            compressed.append(k_means_centers[x][y])
+    for x in range(len(test_point)):
+        compressed.append(test_point[x])
+    compressed.append(base_loss)
     return compressed
 
-def save_change_loss_info(protos, counts, test_point, base_loss, change_in_loss):
+def save_change_loss_info(protos, counts, k_means_centers, test_point, base_loss, change_in_loss):
     with open("change_in_losses.txt", "a") as f:
-        compressed = compress_protos(protos, counts)
+        compressed = compress_protos(protos, counts, k_means_centers, test_point, base_loss)
         f.write(str(counts[0]))
         for x in range(1, len(compressed)):
-            f.write(","+str(compressed[x]))
-        for x in range(len(test_point)):
-            f.write("," + str(test_point[x]))
-        f.write(",", str(base_loss))
+            f.write("," + str(compressed[x]))
+        f.write("," + str(change_in_loss) + "\n")
+
+def get_probabilities(protos, point):
+    dists = []
+    for x in range(len(protos)):
+        dist = torch.dist(protos[x], point)
+        dists.append(np.exp(-1*dist))
+    probs = []
+    sdists = sum(dists)
+    for dist in dists:
+        probs.append(dist / sdists)
+    return probs
+
+#Only save key metrics: distance to protos
+def save_change_loss_info2(protos, counts, k_means_centers, test_point, emb_images, base_loss, change_in_loss):
+    with open("change_in_losses2.txt", "a") as f:
+        compressed = compress_protos(protos, counts, k_means_centers, test_point, base_loss)
+        f.write(str(counts[0]))
+        for x in range(1, len(compressed)):
+            f.write("," + str(compressed[x]))
+        for x in range(len(protos)):
+            dist = torch.dist(protos[x], test_point)
+            f.write(",")
+            f.write(str(dist))
+        probs = get_probabilities(protos, test_point)
+        for prob in probs:
+            f.write("," + str(prob))
+        for x in range(len(k_means_centers)):
+            dist = torch.dist(protos[x], test_point)
+            f.write(",")
+            f.write(str(dist))
+        probs = get_probabilities(k_means_centers, test_point)
+        for prob in probs:
+            f.write("," + str(prob))
+        for img in emb_images:
+            dist = torch.dist(img, test_point)
+            f.write(",")
+            f.write(str(dist))
+        f.write("," + str(base_loss))
         f.write("," + str(change_in_loss) + "\n")
         
 def get_lcm(items):
@@ -301,8 +343,10 @@ def create_random_unequal_sample(sample, model):
 
     support_inds_base = [x * n_s for x in range(n_c)] # add one of each class
     rand_perm = torch.randperm(n_t)
-    support_inds = [rand_perm[x] for x in range(n_c*n_s)]
-    query_inds = [rand_perm[x] for x in range(n_c*n_s, n_t)]
+    if (min(rand_perm) != 0 or max(rand_perm) != (n_t-1) or len(rand_perm != n_t)):
+        raise ValueError
+    support_inds = [rand_perm[x]-1 for x in range(n_c*n_s)]
+    query_inds = [rand_perm[x]-1 for x in range(n_c*n_s, n_t)]
 
     swap_loc = 0 #ensure all base support points are in support_inds
     for ind in support_inds_base:
@@ -550,7 +594,8 @@ def create_smallest_sum_dist_diffs1_rand_batch(sample, model):
         else:
             query_inds.append(ind)
 
-    for x in range(n_c+1, n_c*n_s): #add random points
+    random.shuffle(query_inds)
+    for x in range(n_c+1, n_c*n_s): #add random points !!!!NOT RANDOM
         support_inds.append(query_inds[x])
 
     query_inds = query_inds[(n_c*n_s-(n_c+1)):]
@@ -600,12 +645,11 @@ def create_smallest_sum_dist_diffs_pair_batch(sample, model):
             if ind not in support_inds:
                 support_inds.append(ind)
                 break
-
-    for x in range(len(support_inds), n_s*n_c):
-        ind = 0
-        while ind in support_inds:
-            ind += 1
-        support_inds.append(ind)
+    
+    while (len(support_inds) < n_s*n_c):
+        ind = random.randint(0, n_t-1)
+        if ind not in support_inds:
+            support_inds.append(ind)
 
     query_inds = []
     for x in range(n_t):
@@ -863,14 +907,15 @@ def create_k_means_centers_batch(sample, model):
     emb_images = get_embedded_space_images(sample, model)
 
     support_inds_base = [x * n_s for x in range(n_c)] # add one of each class
+    classes = [[support_inds_base[x]] for x in range(n_c)]
     k_means_centers = get_k_means_centers(emb_images, classes, n_c)
 
     for x in range(n_c):
-        emb_images[support_inds_base[x]] = k_means_centers[x]
+        orig_images[support_inds_base[x]] = k_means_centers[x]
         
     query_inds = []
     for x in range(n_t):
-        if x not in support_inds:
+        if x not in support_inds_base:
             query_inds.append(x)
 
     new_sample= get_new_sample(sample, orig_images, support_inds_base, query_inds, n_c, n_s, n_q)
@@ -882,6 +927,7 @@ def add_one_to_sample(sample, add_ind, model):
     n_c, n_s, n_q, n_t = get_sample_size(sample)
     orig_images = copy_images(sample, n_c, n_s, n_q)
     emb_images = get_embedded_space_images(sample, model)
+    orig_add_ind = add_ind
 
     support_inds_base = [x * n_s for x in range(n_c)] # add one of each class
     support_inds = [ind for ind in support_inds_base]
@@ -910,27 +956,56 @@ def add_one_to_sample(sample, add_ind, model):
     for x in range(n_t):
         if x not in support_inds:
             query_inds.append(x)
-
+    k_means_centers = get_k_means_centers(emb_images, classes, n_c)
     new_sample= get_new_sample(sample, orig_images, support_inds, query_inds, n_c, n_s, n_q)
 
-    return new_sample, protos, emb_images[x], class_counts
+    emb_images_ex = []
+    for ind in query_inds:
+        emb_images_ex.append(emb_images[ind])
+    
+    return new_sample, protos, emb_images[orig_add_ind], class_counts, k_means_centers, emb_images_ex
 
 def get_meta_learning_nn_sample(sample, model):
+    n_c, n_s, n_q, n_t = get_sample_size(sample)
+    orig_images = copy_images(sample, n_c, n_s, n_q)
+    emb_images = get_embedded_space_images(sample, model)
+
+    support_inds_base = [x * n_s for x in range(n_c)] # add one of each class
+    support_inds = [ind for ind in support_inds_base]
+    protos = [emb_images[support_inds_base[x]] for x in range(n_c)]
+    counts = [1 for x in range(n_c)]
+    
     best_add = 0
     best_loss_change = -1e30
-    input_layer = [tf.feature_column.numeric_column("x", shape=[3925])]
+    layer_size = 6*(64+1)
+    input_layer = [tf.feature_column.numeric_column("x", shape=[layer_size])]
 
     tf_optimizer=tf.train.ProximalAdagradOptimizer(learning_rate=0.1,
                                   l2_regularization_strength=0.0)
+    #tf_optimizer = tf.train.AdamOptimizer()
     #mod_dir = "C:/Users/Cameron/Anaconda2/envs/PY_36/Lib/site-packages/protonets/utils/active_model"
-    mod_dir = "active_model"
+    mod_dir = "active_model9"
+    #mod_dir = "active_model_lr_2"
 
     voicerecog_classifier = tf.estimator.DNNRegressor(feature_columns=input_layer,
-                          hidden_units=[3925,3925], model_dir=mod_dir,
-                                      optimizer=tf_optimizer,  dropout=0.5)
-    for x in range(95):
-        new_sample, protos, counts = create_new_sample(copy.deepcopy(sample), str(x))
-        flat_features = compress_protos(protos, counts)
+                          hidden_units=[layer_size, layer_size], model_dir=mod_dir,
+                                      optimizer=tf_optimizer,  dropout=0.1)
+
+    #voicerecog_classifier = tf.estimator.LinearRegressor(feature_columns=input_layer,
+    #                      model_dir=mod_dir,
+    #                                  optimizer=tf_optimizer)
+
+    new_sample = create_new_sample(copy.deepcopy(sample), "one_shot", model)
+    _, output = model.loss(new_sample)
+    base_loss = output['loss']
+    diff_losses = []
+    
+    for x in range(n_t):
+        if x in support_inds:
+            diff_losses.append(0)
+            continue
+        test_point = emb_images[x]
+        flat_features = compress_protos(protos, counts, test_point, base_loss)
 
         predict_input_fn = tf.estimator.inputs.numpy_input_fn(
         x={"x": np.array([flat_features,])},
@@ -941,12 +1016,21 @@ def get_meta_learning_nn_sample(sample, model):
         #print(predict_results)
         for item in predict_results:
             val = item['predictions'][0]
-            if val > best_loss_change:
-                #print(val, x)
-                best_add = x
-                best_loss_change = val
+            diff_losses.append(val)
 
-    new_sample, protos, counts = create_new_sample(copy.deepcopy(sample), best_add)
+    for x in range(n_c*n_s - n_c): #n_s*n_c - n_c
+        max_val = max(diff_losses)
+        max_ind = diff_losses.index(max_val)
+        diff_losses[max_ind] = 0
+        support_inds.append(max_ind)
+
+    query_inds = []
+    for x in range(n_t):
+        if x not in support_inds:
+            query_inds.append(x)
+
+    new_sample= get_new_sample(sample, orig_images, support_inds, query_inds, n_c, n_s, n_q)
+    
     return new_sample
     
 def create_new_sample(sample, sample_mode, model):
@@ -988,6 +1072,7 @@ def create_new_sample(sample, sample_mode, model):
         return create_smallest_sum_dist_diffs_b(sample, model)
     if sample_mode == "smallest_sum_dist_diffs_c":
         return create_smallest_sum_dist_diffs_c(sample, model)
+    
     if sample_mode == "meta_learning_nn":
         return get_meta_learning_nn_sample(sample, model)
     return add_one_to_sample(sample, int(sample_mode), model)

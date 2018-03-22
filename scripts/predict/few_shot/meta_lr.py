@@ -28,15 +28,15 @@ NUM_HIDDEN = 512 #
 NUM_CLASSES = 3
 TRAIN_SET_SIZE = 40
 TRAIN_STEPS = 500
-TRAIN_ITS = 20000
+TRAIN_ITS = 2000
 EVALUATE_ONLY = False
-MODEL_DIR = "active_model9"
+MODEL_DIR = "active_model_lr_2"
 
 random.seed(1234)
 
-LAYERS = [LAYER_SIZE, LAYER_SIZE]
+LAYERS = [int(LAYER_SIZE/2), int(LAYER_SIZE/2)]
 
-DROPOUT = 0.1
+DROPOUT = 0.3
 REG_STRENGTHS = [0.0, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
 tf.logging.set_verbosity(tf.logging.ERROR)
@@ -52,8 +52,13 @@ def get_data():
 
         for x in range(len(sline)):
           sline[x] = float(sline[x])
-        data.append(sline[:-1])
-        labels.append(sline[-1])
+        data.append(sline)
+        #data.append(sline[:-1])
+        #labels.append(sline[-1])
+    random.shuffle(data)
+    for x in range(len(data)):
+      labels.append(data[x][-1])
+      data[x] = data[x][:-1]
     split = int(0.8*len(data))
     train_data = data[:split]
     train_labels = labels[:split]
@@ -67,6 +72,7 @@ def main(unused_argv):
   # Load training and eval data
   print("Loading Data...")
   train_data, train_labels, eval_data, eval_labels = get_data()
+  print("Train:", train_data.shape, "Eval:", eval_data.shape)
 
   # Create the Estimator
   print("Creating Classifier...")
@@ -74,10 +80,11 @@ def main(unused_argv):
 
   tf_optimizer=tf.train.ProximalAdagradOptimizer(learning_rate=0.1,
                                   l2_regularization_strength=0.0)
+  tf_optimizer = tf.train.AdamOptimizer()
 
-  voicerecog_classifier = tf.estimator.DNNRegressor(feature_columns=input_layer,
-                          hidden_units=LAYERS, model_dir=MODEL_DIR,
-                                      optimizer=tf_optimizer,  dropout=DROPOUT)
+  voicerecog_classifier = tf.estimator.LinearRegressor(feature_columns=input_layer,
+                          model_dir=MODEL_DIR,
+                                      optimizer=tf_optimizer)
   tensors_to_log = {}
   logging_hook = tf.train.LoggingTensorHook(
         tensors=tensors_to_log, every_n_iter=50)
@@ -103,7 +110,7 @@ def main(unused_argv):
             num_epochs=1,
             shuffle=False)
     eval_results = voicerecog_classifier.evaluate(input_fn=eval_input_fn)
-    print(eval_results)
+    print("Train:", eval_results)
 
     # Evaluate the model and print results
     eval_input_fn = tf.estimator.inputs.numpy_input_fn(
@@ -112,7 +119,7 @@ def main(unused_argv):
             num_epochs=1,
             shuffle=False)
     eval_results = voicerecog_classifier.evaluate(input_fn=eval_input_fn)
-    print(eval_results)
+    print("Val:", eval_results)
 
 if __name__ == "__main__":
   tf.app.run()
